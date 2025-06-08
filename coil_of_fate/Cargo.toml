@@ -5,3 +5,5 @@ edition = "2024"
 authors.workspace = true
 
 [dependencies]
+coil_engine = { path = "../coil_engine" }
+crossterm = { workspace = true }

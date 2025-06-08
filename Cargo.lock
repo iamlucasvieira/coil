@@ -91,6 +91,10 @@ dependencies = [
 [[package]]
 name = "coil_of_fate"
 version = "0.1.0"
+dependencies = [
+ "coil_engine",
+ "crossterm",
+]
 
 [[package]]
 name = "colorchoice"

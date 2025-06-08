@@ -1,4 +1,4 @@
-use coil_engine::{EventLoop, GameState, InputStrategy};
+use coil_engine::{EventLoop, GameConfig, GameState, InputStrategy};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 struct EchoGame {
@@ -41,22 +41,24 @@ impl GameState for EchoGame {
 
     fn render(&self) {
         if self.should_print {
+            print!("\x1B[2J\x1B[1;1H"); // Clear screen and move cursor to top-left
             println!("{}\n", self.message);
         }
     }
 }
 
-const FRAME_RATE: u32 = 60;
-
 fn main() {
     env_logger::init();
+
+    // Create game configuration
+    let config = GameConfig::new()
+        .with_target_fps(60)
+        .with_input_strategy(InputStrategy::NonBlocking);
 
     // Create an instance of the game state
     let mut game_state = EchoGame::new();
 
-    EventLoop::new(FRAME_RATE)
-        .unwrap()
-        .with_input_strategy(InputStrategy::NonBlocking)
-        .run(&mut game_state)
-        .unwrap();
+    // Create event loop and run the game
+    let mut event_loop = EventLoop::new().unwrap();
+    event_loop.run(&mut game_state, &config).unwrap();
 }

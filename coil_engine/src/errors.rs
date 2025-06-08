@@ -14,6 +14,10 @@ pub enum EngineError {
     /// Event Loop error, typically related to event handling.
     #[error("event loop error: {0}")]
     EventLoop(String),
+
+    /// Configuration error, typically related to game settings.
+    #[error("configuration error: {0}")]
+    Config(String),
 }
 
 #[cfg(test)]
@@ -34,6 +38,7 @@ mod tests {
             EngineError::Input(_) => "input error".to_string(),
             EngineError::Io(_) => "io error".to_string(),
             EngineError::EventLoop(_) => "test event loop error".to_string(),
+            EngineError::Config(_) => "configuration error".to_string(),
         }
     }
 
