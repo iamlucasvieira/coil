@@ -2,3 +2,7 @@
 resolver = "3"
 members = ["coil_engine", "coil_of_fate"]
 
+[workspace.package]
+authors = ["Lucas Vieira dos Santos <lucas6end@gmail.com>"]
+
+
