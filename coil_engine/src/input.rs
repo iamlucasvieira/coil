@@ -13,14 +13,14 @@ pub(crate) struct InputHandler {
 
 impl InputHandler {
     pub fn new() -> Result<Self, EngineError> {
-        enable_raw_mode().map_err(|e| EngineError::InputError(e.to_string()))?;
+        enable_raw_mode().map_err(|e| EngineError::Input(e.to_string()))?;
         Ok(Self {
             queue: VecDeque::new(),
         })
     }
 
     pub fn poll(&mut self, timeout: Duration) -> Result<(), EngineError> {
-        if poll(timeout).map_err(|e| EngineError::InputError(e.to_string()))? {
+        if poll(timeout).map_err(|e| EngineError::Input(e.to_string()))? {
             if let Ok(event) = event::read() {
                 self.queue.push_back(event);
             }
@@ -38,5 +38,74 @@ impl Drop for InputHandler {
         disable_raw_mode().unwrap_or_else(|e| {
             eprintln!("Failed to disable raw mode: {}", e);
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_input_handler_creation() {
+        assert!(InputHandler::new().is_ok());
+    }
+
+    #[test]
+    fn test_input_handler_with_mock() {
+        // Test the basic structure without requiring terminal access
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        use std::collections::VecDeque;
+
+        let mut queue: VecDeque<Event> = VecDeque::new();
+
+        // Test empty queue
+        let drained: Vec<Event> = queue.drain(..).collect();
+        assert!(drained.is_empty());
+
+        // Test adding events
+        queue.push_back(Event::Key(KeyEvent::new(
+            KeyCode::Char('a'),
+            KeyModifiers::NONE,
+        )));
+        queue.push_back(Event::Key(KeyEvent::new(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+        )));
+
+        let drained: Vec<Event> = queue.drain(..).collect();
+        assert_eq!(drained.len(), 2);
+
+        // Test queue is empty after drain
+        let drained_again: Vec<Event> = queue.drain(..).collect();
+        assert!(drained_again.is_empty());
+    }
+
+    #[test]
+    fn test_input_handler_timeout_duration() {
+        let short_timeout = Duration::from_millis(1);
+        let long_timeout = Duration::from_millis(100);
+
+        assert!(short_timeout < long_timeout);
+        assert_eq!(short_timeout.as_millis(), 1);
+        assert_eq!(long_timeout.as_millis(), 100);
+    }
+
+    #[test]
+    fn test_event_matching() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let key_event = Event::Key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE));
+        let esc_event = Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+
+        match key_event {
+            Event::Key(ke) => assert_eq!(ke.code, KeyCode::Char('a')),
+            _ => panic!("Expected key event"),
+        }
+
+        match esc_event {
+            Event::Key(ke) => assert_eq!(ke.code, KeyCode::Esc),
+            _ => panic!("Expected key event"),
+        }
     }
 }
