@@ -1,8 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["coil_engine", "coil_of_fate"]
+members = ["coil_engine", "coil_of_fate", "echo"]
 
 [workspace.package]
 authors = ["Lucas Vieira dos Santos <lucas6end@gmail.com>"]
+
+[workspace.dependencies]
+crossterm = "0.29.0"
 
 

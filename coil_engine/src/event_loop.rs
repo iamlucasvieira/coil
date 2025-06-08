@@ -1,6 +1,7 @@
 use crate::errors::EngineError;
 use crate::input::InputHandler;
 use crossterm::event::Event;
+use log::{debug, error, info};
 use std::time::{Duration, Instant};
 
 /// Trait that defines the interface for game logic implementation.
@@ -46,6 +47,7 @@ impl EventLoop {
     /// * `Ok(EventLoop)` on success
     /// * `Err(EngineError)` if input handler initialization fails
     pub fn new(target_fps: u32) -> Result<Self, EngineError> {
+        debug!("Creating event loop with target FPS: {}", target_fps);
         Self::validate_target_fps(target_fps)?;
         Ok(Self {
             target_fps,
@@ -54,7 +56,9 @@ impl EventLoop {
     }
 
     fn validate_target_fps(target_fps: u32) -> Result<(), EngineError> {
+        debug!("Validating target FPS: {}", target_fps);
         if target_fps == 0 {
+            error!("Invalid target FPS: {}", target_fps);
             Err(EngineError::EventLoop(
                 "Target FPS must be greater than zero".to_string(),
             ))
@@ -76,6 +80,7 @@ impl EventLoop {
     /// * `Ok(())` when the game exits normally
     /// * `Err(EngineError)` if an error occurs during execution
     pub fn run<G: GameState>(&mut self, state: &mut G) -> Result<(), EngineError> {
+        debug!("Starting event loop with target FPS: {}", self.target_fps);
         let mut previous_time = Instant::now();
         let mut lag_time = Duration::ZERO;
         let frame_duration = Duration::from_secs_f32(1.0 / self.target_fps as f32);
@@ -89,10 +94,10 @@ impl EventLoop {
                 }
             }
 
-            let current_time = Instant::now();
-            let elapsed_time = current_time.duration_since(previous_time);
-            lag_time += elapsed_time;
-            previous_time = current_time;
+            let now = Instant::now();
+            let elapsed = now.duration_since(previous_time);
+            lag_time += elapsed;
+            previous_time = now;
 
             while lag_time >= frame_duration {
                 state.update(frame_duration.as_secs_f32());
