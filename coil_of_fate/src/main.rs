@@ -1,4 +1,4 @@
-use coil_engine::{EventLoop, GameConfig, GameState};
+use coil_engine::{Config, Game, GameState};
 use crossterm::event::Event;
 
 struct MyGame {
@@ -47,18 +47,11 @@ impl GameState for MyGame {
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create game configuration
-    let config = GameConfig::new().with_target_fps(60).with_debug_mode(true);
-
-    // Create event loop
-    let mut event_loop = EventLoop::new()?;
-
-    // Create game state
-    let mut game = MyGame::new();
-
-    // Run the game loop
-    event_loop.run(&mut game, &config)?;
-
-    Ok(())
+fn main() {
+    Game::new(MyGame::new())
+        .add_config(Config::TargetFps(60))
+        .add_config(Config::InputStrategy(
+            coil_engine::InputStrategy::NonBlocking,
+        ))
+        .start();
 }

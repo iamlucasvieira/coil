@@ -142,7 +142,7 @@ impl EventLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::GameConfig;
+    use crate::config::{Config, GameConfig};
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use std::sync::{Arc, Mutex};
 
@@ -334,7 +334,8 @@ mod tests {
 
     #[test]
     fn test_game_config_with_event_loop() {
-        let config = GameConfig::new().with_target_fps(30);
+        let config = GameConfig::new().add_config(Config::TargetFps(30));
+
         assert!(config.validate().is_ok());
         assert_eq!(config.target_fps, 30);
     }
