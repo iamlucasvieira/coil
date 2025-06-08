@@ -7,6 +7,29 @@ use std::time::Duration;
 
 use std::collections::VecDeque;
 
+#[derive(Debug, Clone, Copy, Default)]
+/// Defines how input events should be handled in the engine.
+pub enum InputStrategy {
+    /// Non-blocking: grab every event currently queued, then sleep to cap FPS.
+    #[default]
+    NonBlocking,
+    /// Frame-budgeted: block up to one frame’s duration, then update/render immediately.
+    FrameBudgeted,
+    /// A custom timeout (in ms) each frame.
+    Timeout(Duration),
+}
+
+impl InputStrategy {
+    /// Returns the timeout duration for the input strategy.
+    pub fn timeout(&self) -> Duration {
+        match self {
+            InputStrategy::NonBlocking => Duration::from_millis(1), // Short timeout for responsiveness
+            InputStrategy::FrameBudgeted => Duration::from_millis(16), // ~60 FPS
+            InputStrategy::Timeout(duration) => *duration,
+        }
+    }
+}
+
 pub(crate) struct InputHandler {
     queue: VecDeque<Event>,
 }
@@ -20,7 +43,7 @@ impl InputHandler {
     }
 
     pub fn poll(&mut self, timeout: Duration) -> Result<(), EngineError> {
-        if poll(timeout).map_err(|e| EngineError::Input(e.to_string()))? {
+        while poll(timeout)? {
             if let Ok(event) = event::read() {
                 self.queue.push_back(event);
             }

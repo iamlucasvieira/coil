@@ -1,7 +1,7 @@
 use crate::errors::EngineError;
-use crate::input::InputHandler;
+use crate::input::{InputHandler, InputStrategy};
 use crossterm::event::Event;
-use log::{debug, error, info};
+use log::{debug, error};
 use std::time::{Duration, Instant};
 
 /// Trait that defines the interface for game logic implementation.
@@ -34,6 +34,7 @@ pub trait GameState {
 /// consistent game timing regardless of frame rate variations.
 pub struct EventLoop {
     target_fps: u32,
+    input_strategy: InputStrategy,
     input_handler: InputHandler,
 }
 
@@ -51,8 +52,15 @@ impl EventLoop {
         Self::validate_target_fps(target_fps)?;
         Ok(Self {
             target_fps,
+            input_strategy: InputStrategy::default(),
             input_handler: InputHandler::new()?,
         })
+    }
+
+    pub fn with_input_strategy(mut self, strategy: InputStrategy) -> Self {
+        debug!("Setting input strategy: {:?}", strategy);
+        self.input_strategy = strategy;
+        self
     }
 
     fn validate_target_fps(target_fps: u32) -> Result<(), EngineError> {
@@ -86,7 +94,7 @@ impl EventLoop {
         let frame_duration = Duration::from_secs_f32(1.0 / self.target_fps as f32);
 
         loop {
-            self.input_handler.poll(frame_duration)?;
+            self.input_handler.poll(self.input_strategy.timeout())?;
 
             for event in self.input_handler.drain() {
                 if state.on_event(event) {

@@ -1,4 +1,4 @@
-use coil_engine::{EventLoop, GameState};
+use coil_engine::{EventLoop, GameState, InputStrategy};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 struct EchoGame {
@@ -54,15 +54,9 @@ fn main() {
     // Create an instance of the game state
     let mut game_state = EchoGame::new();
 
-    // Create an event loop to run the game
-    let mut event_loop = EventLoop::new(FRAME_RATE).unwrap_or_else(|e| {
-        eprintln!("Failed to create event loop: {}", e);
-        std::process::exit(1);
-    });
-
-    // Run the event loop
-    event_loop.run(&mut game_state).unwrap_or_else(|e| {
-        eprintln!("Event loop error: {}", e);
-        std::process::exit(1);
-    });
+    EventLoop::new(FRAME_RATE)
+        .unwrap()
+        .with_input_strategy(InputStrategy::NonBlocking)
+        .run(&mut game_state)
+        .unwrap();
 }
