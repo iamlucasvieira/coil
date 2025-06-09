@@ -1,19 +1,24 @@
 use crate::config::{Config, GameConfig};
 use crate::errors::EngineError;
-use crate::event_loop::{EventLoop, GameState};
+use crate::event_loop::EventLoop;
+use crate::nodes::Node;
 use std::process;
 
-pub struct Game<S> {
-    pub state: S,
+pub struct Game<N> {
+    pub node: N,
     pub config: GameConfig,
 }
 
-impl<S: GameState> Game<S> {
-    pub fn new(state: S) -> Self {
+impl<N: Node> Game<N> {
+    pub fn new(node: N) -> Self {
         Self {
-            state,
+            node,
             config: GameConfig::new(),
         }
+    }
+
+    pub fn with_config(node: N, config: GameConfig) -> Self {
+        Self { node, config }
     }
 
     pub fn add_config(mut self, config: Config) -> Self {
@@ -24,7 +29,7 @@ impl<S: GameState> Game<S> {
     pub fn start(&mut self) {
         if let Err(e) = (|| -> Result<(), EngineError> {
             let mut event_loop = EventLoop::new(&self.config)?;
-            event_loop.run(&mut self.state)?;
+            event_loop.run::<N>(&mut self.node)?;
             Ok(())
         })() {
             eprintln!("Error running game: {}", e);

@@ -1,4 +1,9 @@
-use coil_engine::{BasicRenderer, Cell, Config, Game, GameState, Renderer};
+use coil_engine::{
+    Game,
+    config::GameConfig,
+    nodes::Node,
+    renderer::{Cell, Renderer},
+};
 use crossterm::event::{Event, KeyCode, KeyEvent, MouseEvent, MouseEventKind};
 use crossterm::style::Color;
 use rand::Rng;
@@ -16,54 +21,47 @@ const DEAD_CELL: Cell = Cell {
 };
 
 struct Grid {
-    width: usize,
-    height: usize,
+    width: u16,
+    height: u16,
     cells: Vec<bool>,
 }
 
 impl Grid {
-    fn new() -> Self {
-        Grid {
-            width: 0,
-            height: 0,
-            cells: Vec::new(),
-        }
-    }
-
-    fn set_size(&mut self, width: usize, height: usize) {
-        self.width = width;
-        self.height = height;
-        self.cells.resize(width * height, false);
-
-        // Randomly initialize the grid
+    fn new(width: u16, height: u16) -> Self {
         let mut rng = rand::rng();
-        for cell in self.cells.iter_mut() {
+        let mut cells = vec![false; (width * height) as usize];
+        for cell in cells.iter_mut() {
             *cell = rng.random_bool(0.1);
         }
+        Grid {
+            width,
+            height,
+            cells,
+        }
     }
 
-    fn get(&self, x: usize, y: usize) -> bool {
+    fn get(&self, x: u16, y: u16) -> bool {
         if x < self.width && y < self.height {
-            self.cells[y * self.width + x]
+            self.cells[(y * self.width + x) as usize]
         } else {
             false
         }
     }
 
-    fn coordinates(&self, index: usize) -> Option<(usize, usize)> {
+    fn coordinates(&self, index: usize) -> Option<(u16, u16)> {
         if index < self.cells.len() {
-            Some((index % self.width, index / self.width))
+            Some((index as u16 % self.width, index as u16 / self.width))
         } else {
             None
         }
     }
 
-    fn get_neighbors(&self, x: usize, y: usize) -> usize {
+    fn get_neighbors(&self, x: u16, y: u16) -> usize {
         let mut count = 0;
         for dy in -1..=1 {
             for dx in -1..=1 {
                 if (dx != 0 || dy != 0)
-                    && self.get((x as isize + dx) as usize, (y as isize + dy) as usize)
+                    && self.get((x as isize + dx) as u16, (y as isize + dy) as u16)
                 {
                     count += 1;
                 }
@@ -72,20 +70,26 @@ impl Grid {
         count
     }
 
-    fn set(&mut self, x: usize, y: usize, value: bool) {
+    fn set(&mut self, x: u16, y: u16, value: bool) {
         if x < self.width && y < self.height {
-            self.cells[y * self.width + x] = value;
+            self.cells[(y * self.width + x) as usize] = value;
         }
     }
 }
 
 struct PauseMenu {
+    width: u16,
+    height: u16,
     paused: bool,
 }
 
 impl PauseMenu {
-    fn new() -> Self {
-        PauseMenu { paused: false }
+    fn new(width: u16, height: u16) -> Self {
+        PauseMenu {
+            width,
+            height,
+            paused: false,
+        }
     }
 
     fn is_paused(&self) -> bool {
@@ -93,7 +97,7 @@ impl PauseMenu {
     }
 }
 
-impl GameState for PauseMenu {
+impl Node for PauseMenu {
     fn update(&mut self, _delta_time: f32) {}
 
     fn on_event(&mut self, event: Event) -> bool {
@@ -109,13 +113,11 @@ impl GameState for PauseMenu {
         }
     }
 
-    fn render(&self, renderer: &mut BasicRenderer) {
+    fn render(&self, renderer: &mut dyn Renderer) {
         if self.paused {
             let pause_text = "Game Paused. Press Space to Resume.";
-            let (width, height) = renderer.size();
-            // scale to center the text
-            let x = (width / 2) - (pause_text.len() as u16 / 2);
-            let y = height / 2;
+            let x = (self.width / 2) - (pause_text.len() as u16 / 2);
+            let y = self.height / 2;
 
             renderer
                 .draw_str(x, y, pause_text, Color::Reset, Color::DarkBlue)
@@ -130,15 +132,15 @@ struct GameOfLife {
 }
 
 impl GameOfLife {
-    fn new() -> Self {
+    fn new(width: u16, height: u16) -> Self {
         GameOfLife {
-            grid: Grid::new(),
-            pause_menu: PauseMenu::new(),
+            grid: Grid::new(width, height),
+            pause_menu: PauseMenu::new(width, height),
         }
     }
 }
 
-impl GameState for GameOfLife {
+impl Node for GameOfLife {
     fn update(&mut self, _delta_time: f32) {
         if self.pause_menu.is_paused() {
             return; // Skip update if paused
@@ -173,8 +175,7 @@ impl GameState for GameOfLife {
                 row,
                 ..
             }) => {
-                let x = column as usize;
-                let y = row as usize;
+                let (x, y) = (column, row);
                 if x < self.grid.width && y < self.grid.height {
                     let current_state = self.grid.get(x, y);
                     self.grid.set(x, y, !current_state);
@@ -185,13 +186,13 @@ impl GameState for GameOfLife {
         }
     }
 
-    fn render(&self, renderer: &mut BasicRenderer) {
+    fn render(&self, renderer: &mut dyn Renderer) {
         for y in 0..self.grid.height {
             for x in 0..self.grid.width {
                 if self.grid.get(x, y) {
-                    renderer.draw_cell(x as u16, y as u16, ALIVE_CELL).unwrap();
+                    renderer.draw_cell(x, y, ALIVE_CELL).unwrap();
                 } else {
-                    renderer.draw_cell(x as u16, y as u16, DEAD_CELL).unwrap();
+                    renderer.draw_cell(x, y, DEAD_CELL).unwrap();
                 }
             }
         }
@@ -200,8 +201,10 @@ impl GameState for GameOfLife {
 }
 
 fn main() {
-    let mut game = Game::new(GameOfLife::new()).add_config(Config::TargetFps(2));
-    let (width, height) = game.config.screen_size;
-    game.state.grid.set_size(width as usize, height as usize);
-    game.start();
+    let config = GameConfig {
+        target_fps: 10,
+        ..Default::default()
+    };
+    let (width, height) = config.screen_size;
+    Game::with_config(GameOfLife::new(width, height), config).start();
 }

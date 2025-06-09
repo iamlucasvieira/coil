@@ -1,4 +1,4 @@
-use coil_engine::{BasicRenderer, Config, Game, GameState, Renderer};
+use coil_engine::{Game, config::Config, nodes::Node, renderer::Renderer};
 use crossterm::event::Event;
 
 struct MyGame {
@@ -12,7 +12,7 @@ impl MyGame {
     }
 }
 
-impl GameState for MyGame {
+impl Node for MyGame {
     fn update(&mut self, _delta_time: f32) {
         self.frame_count += 1;
     }
@@ -32,7 +32,7 @@ impl GameState for MyGame {
         }
     }
 
-    fn render(&self, renderer: &mut BasicRenderer) {
+    fn render(&self, renderer: &mut dyn Renderer) {
         renderer
             .draw_str(
                 0,
@@ -57,8 +57,5 @@ impl GameState for MyGame {
 fn main() {
     Game::new(MyGame::new())
         .add_config(Config::TargetFps(60))
-        .add_config(Config::InputStrategy(
-            coil_engine::InputStrategy::NonBlocking,
-        ))
         .start();
 }

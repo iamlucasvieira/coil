@@ -1,4 +1,4 @@
-use coil_engine::{BasicRenderer, Config, Game, GameState, InputStrategy, Renderer};
+use coil_engine::{Game, config::Config, nodes::Node, renderer::Renderer};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::Color;
 
@@ -14,7 +14,7 @@ impl EchoGame {
     }
 }
 
-impl GameState for EchoGame {
+impl Node for EchoGame {
     fn update(&mut self, _delta_time: f32) {}
 
     fn on_event(&mut self, event: Event) -> bool {
@@ -35,7 +35,7 @@ impl GameState for EchoGame {
         }
     }
 
-    fn render(&self, renderer: &mut BasicRenderer) {
+    fn render(&self, renderer: &mut dyn Renderer) {
         renderer
             .draw_str(0, 0, &self.message, Color::Black, Color::White)
             .unwrap();
@@ -47,6 +47,5 @@ fn main() {
 
     Game::new(EchoGame::new())
         .add_config(Config::TargetFps(60))
-        .add_config(Config::InputStrategy(InputStrategy::NonBlocking))
         .start();
 }

@@ -1,62 +1,10 @@
 use crate::config::GameConfig;
 use crate::errors::EngineError;
 use crate::input::InputHandler;
+use crate::nodes::Node;
 use crate::renderer::{BasicRenderer, Renderer};
-use crossterm::event::Event;
 use log::{debug, warn};
 use std::time::{Duration, Instant};
-
-/// Trait that defines the interface for game logic implementation.
-///
-/// Game implementations must implement this trait to define how the game
-/// updates, handles events, and renders. This trait supports state machines
-/// and entity-specific loops.
-pub trait GameState {
-    /// Updates the game state based on the elapsed time since the last frame.
-    ///
-    /// This method can contain state machine logic and update entities
-    /// that have their own update loops.
-    ///
-    /// # Arguments
-    /// * `delta_time` - Time elapsed since the last update in seconds
-    fn update(&mut self, delta_time: f32);
-
-    /// Handles input events from the terminal.
-    ///
-    /// # Arguments
-    /// * `event` - The input event to handle
-    ///
-    /// # Returns
-    /// * `true` if the game should exit, `false` to continue running
-    fn on_event(&mut self, event: Event) -> bool;
-
-    /// Renders the current game state to the terminal.
-    fn render(&self, renderer: &mut BasicRenderer);
-}
-
-/// Trait for entities that can have their own update logic within the main loop.
-/// This allows for character AI, animations, or other entity-specific behavior.
-pub trait Entity {
-    /// Updates the entity's state.
-    fn update(&mut self, delta_time: f32);
-
-    /// Returns true if the entity is active and should continue updating.
-    fn is_active(&self) -> bool;
-}
-
-/// Trait for state machines that can transition between different states.
-pub trait StateMachine {
-    type State;
-
-    /// Gets the current state.
-    fn current_state(&self) -> &Self::State;
-
-    /// Transitions to a new state.
-    fn transition_to(&mut self, state: Self::State);
-
-    /// Updates the current state.
-    fn update_state(&mut self, delta_time: f32);
-}
 
 /// Main event loop that manages game timing and coordinates game state updates.
 ///
@@ -95,13 +43,13 @@ impl<'a> EventLoop<'a> {
     /// The loop supports state machines and entity updates through the GameState trait.
     ///
     /// # Arguments
-    /// * `state` - The game state implementation to run
+    /// * `node` - The initial game state implementing the Node trait
     /// * `config` - Configuration for the game loop
     ///
     /// # Returns
     /// * `Ok(())` when the game exits normally
     /// * `Err(EngineError)` if an error occurs during execution
-    pub fn run<G: GameState>(&mut self, state: &mut G) -> Result<(), EngineError> {
+    pub fn run<N: Node>(&mut self, node: &mut dyn Node) -> Result<(), EngineError> {
         debug!("Starting event loop with config: {:?}", self.config);
         let mut previous_time = Instant::now();
         let mut lag_time = Duration::ZERO;
@@ -112,7 +60,7 @@ impl<'a> EventLoop<'a> {
                 .poll(self.config.input_strategy.timeout())?;
 
             for event in self.input_handler.drain() {
-                if state.on_event(event) {
+                if node.on_event(event) {
                     return Ok(());
                 }
             }
@@ -133,12 +81,12 @@ impl<'a> EventLoop<'a> {
             lag_time += elapsed;
 
             while lag_time >= frame_duration {
-                state.update(frame_duration.as_secs_f32());
+                node.update(frame_duration.as_secs_f32());
                 lag_time -= frame_duration;
             }
 
             self.renderer.clear()?;
-            state.render(&mut self.renderer);
+            node.render(&mut self.renderer);
             self.renderer.flush()?;
         }
     }
@@ -148,6 +96,7 @@ impl<'a> EventLoop<'a> {
 mod tests {
     use super::*;
     use crate::config::{Config, GameConfig};
+    use crossterm::event::Event;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use std::sync::{Arc, Mutex};
 
@@ -183,7 +132,7 @@ mod tests {
         }
     }
 
-    impl GameState for MockState {
+    impl Node for MockState {
         fn update(&mut self, _delta_time: f32) {
             let mut count = self.update_count.lock().unwrap();
             *count += 1;
@@ -204,76 +153,9 @@ mod tests {
             false
         }
 
-        fn render(&self, _renderer: &mut BasicRenderer) {
+        fn render(&self, _renderer: &mut dyn Renderer) {
             let mut count = self.render_count.lock().unwrap();
             *count += 1;
-        }
-    }
-
-    // Example entity implementation for testing
-    struct MockEntity {
-        active: bool,
-        update_count: u32,
-    }
-
-    impl MockEntity {
-        fn new() -> Self {
-            Self {
-                active: true,
-                update_count: 0,
-            }
-        }
-
-        fn deactivate(&mut self) {
-            self.active = false;
-        }
-    }
-
-    impl Entity for MockEntity {
-        fn update(&mut self, _delta_time: f32) {
-            if self.active {
-                self.update_count += 1;
-            }
-        }
-
-        fn is_active(&self) -> bool {
-            self.active
-        }
-    }
-
-    // Example state machine implementation
-    #[derive(Debug, PartialEq)]
-    enum GameStateEnum {
-        Menu,
-        Playing,
-        Paused,
-    }
-
-    struct MockStateMachine {
-        current_state: GameStateEnum,
-    }
-
-    impl MockStateMachine {
-        fn new() -> Self {
-            Self {
-                current_state: GameStateEnum::Menu,
-            }
-        }
-    }
-
-    impl StateMachine for MockStateMachine {
-        type State = GameStateEnum;
-
-        fn current_state(&self) -> &Self::State {
-            &self.current_state
-        }
-
-        fn transition_to(&mut self, state: Self::State) {
-            self.current_state = state;
-        }
-
-        fn update_state(&mut self, _delta_time: f32) {
-            // State-specific update logic would go here
         }
     }
 
@@ -309,33 +191,6 @@ mod tests {
 
         let esc_event = Event::Key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
         assert!(state.on_event(esc_event));
-    }
-
-    #[test]
-    fn test_entity_trait_implementation() {
-        let mut entity = MockEntity::new();
-
-        assert!(entity.is_active());
-        entity.update(1.0 / 60.0);
-        assert_eq!(entity.update_count, 1);
-
-        entity.deactivate();
-        assert!(!entity.is_active());
-        entity.update(1.0 / 60.0);
-        assert_eq!(entity.update_count, 1); // Should not increment when inactive
-    }
-
-    #[test]
-    fn test_state_machine_trait_implementation() {
-        let mut state_machine = MockStateMachine::new();
-
-        assert_eq!(*state_machine.current_state(), GameStateEnum::Menu);
-
-        state_machine.transition_to(GameStateEnum::Playing);
-        assert_eq!(*state_machine.current_state(), GameStateEnum::Playing);
-
-        state_machine.transition_to(GameStateEnum::Paused);
-        assert_eq!(*state_machine.current_state(), GameStateEnum::Paused);
     }
 
     #[test]
