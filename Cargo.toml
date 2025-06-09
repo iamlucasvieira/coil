@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["coil_engine", "coil_of_fate", "echo"]
+members = ["coil_engine", "coil_of_fate", "echo", "game_of_life"]
 
 [workspace.package]
 authors = ["Lucas Vieira dos Santos <lucas6end@gmail.com>"]

@@ -1,5 +1,6 @@
 use crate::errors::EngineError;
 use crate::input::InputStrategy;
+use crossterm::terminal;
 use std::time::Duration;
 
 pub enum Config {
@@ -8,6 +9,7 @@ pub enum Config {
     MaxFrameTime(Duration),
     DebugMode(bool),
     Vsync(bool),
+    ScreenSize((u16, u16)),
 }
 /// Configuration for the game engine.
 ///
@@ -25,6 +27,8 @@ pub struct GameConfig {
     pub debug_mode: bool,
     /// Whether to enable vsync-like behavior
     pub vsync: bool,
+    /// Screen size for the game window (width, height)
+    pub screen_size: (u16, u16),
 }
 
 impl GameConfig {
@@ -36,6 +40,7 @@ impl GameConfig {
             max_frame_time: Duration::from_millis(50), // Cap at 20 FPS minimum
             debug_mode: false,
             vsync: true,
+            screen_size: terminal::size().unwrap_or((80, 24)),
         }
     }
 
@@ -46,6 +51,7 @@ impl GameConfig {
             Config::MaxFrameTime(max_time) => self.max_frame_time = max_time,
             Config::DebugMode(debug) => self.debug_mode = debug,
             Config::Vsync(vsync) => self.vsync = vsync,
+            Config::ScreenSize(size) => self.screen_size = size,
         }
         self
     }
@@ -90,4 +96,3 @@ mod tests {
         assert_eq!(config.max_frame_time, Duration::from_millis(50));
     }
 }
-

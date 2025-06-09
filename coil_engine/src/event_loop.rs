@@ -1,6 +1,7 @@
 use crate::config::GameConfig;
 use crate::errors::EngineError;
 use crate::input::InputHandler;
+use crate::renderer::{BasicRenderer, Renderer};
 use crossterm::event::Event;
 use log::{debug, warn};
 use std::time::{Duration, Instant};
@@ -30,7 +31,7 @@ pub trait GameState {
     fn on_event(&mut self, event: Event) -> bool;
 
     /// Renders the current game state to the terminal.
-    fn render(&self);
+    fn render(&self, renderer: &mut BasicRenderer);
 }
 
 /// Trait for entities that can have their own update logic within the main loop.
@@ -62,20 +63,26 @@ pub trait StateMachine {
 /// The event loop uses a fixed timestep with lag compensation to ensure
 /// consistent game timing regardless of frame rate variations. It supports
 /// state machines and entity loops for complex game logic.
-pub struct EventLoop {
+pub struct EventLoop<'a> {
     input_handler: InputHandler,
+    renderer: BasicRenderer,
+    config: &'a GameConfig,
 }
 
-impl EventLoop {
+impl<'a> EventLoop<'a> {
     /// Creates a new event loop.
     ///
     /// # Returns
     /// * `Ok(EventLoop)` on success
     /// * `Err(EngineError)` if input handler initialization fails
-    pub fn new() -> Result<Self, EngineError> {
+    pub fn new(config: &'a GameConfig) -> Result<Self, EngineError> {
         debug!("Creating event loop");
+        config.validate()?;
+        let (width, height) = config.screen_size;
         Ok(Self {
             input_handler: InputHandler::new()?,
+            renderer: BasicRenderer::new(width, height)?,
+            config,
         })
     }
 
@@ -94,19 +101,15 @@ impl EventLoop {
     /// # Returns
     /// * `Ok(())` when the game exits normally
     /// * `Err(EngineError)` if an error occurs during execution
-    pub fn run<G: GameState>(
-        &mut self,
-        state: &mut G,
-        config: &GameConfig,
-    ) -> Result<(), EngineError> {
-        debug!("Starting event loop with config: {:?}", config);
-        config.validate()?;
+    pub fn run<G: GameState>(&mut self, state: &mut G) -> Result<(), EngineError> {
+        debug!("Starting event loop with config: {:?}", self.config);
         let mut previous_time = Instant::now();
         let mut lag_time = Duration::ZERO;
-        let frame_duration = config.frame_duration();
+        let frame_duration = self.config.frame_duration();
 
         loop {
-            self.input_handler.poll(config.input_strategy.timeout())?;
+            self.input_handler
+                .poll(self.config.input_strategy.timeout())?;
 
             for event in self.input_handler.drain() {
                 if state.on_event(event) {
@@ -119,12 +122,12 @@ impl EventLoop {
             previous_time = now;
 
             // Prevent spiral of death by capping frame time
-            if elapsed > config.max_frame_time {
+            if elapsed > self.config.max_frame_time {
                 warn!(
                     "Frame time exceeded maximum: {:?}, capping to {:?}",
-                    elapsed, config.max_frame_time
+                    elapsed, self.config.max_frame_time
                 );
-                elapsed = config.max_frame_time;
+                elapsed = self.config.max_frame_time;
             }
 
             lag_time += elapsed;
@@ -134,7 +137,9 @@ impl EventLoop {
                 lag_time -= frame_duration;
             }
 
-            state.render();
+            self.renderer.clear()?;
+            state.render(&mut self.renderer);
+            self.renderer.flush()?;
         }
     }
 }
@@ -199,7 +204,7 @@ mod tests {
             false
         }
 
-        fn render(&self) {
+        fn render(&self, _renderer: &mut BasicRenderer) {
             let mut count = self.render_count.lock().unwrap();
             *count += 1;
         }
@@ -274,8 +279,8 @@ mod tests {
 
     #[test]
     fn test_event_loop_creation() {
-        // Test creation - may fail in CI environments without terminal access
-        match EventLoop::new() {
+        let config = GameConfig::new();
+        match EventLoop::new(&config) {
             Ok(_) => {
                 // Success case - terminal is available
             }
@@ -291,11 +296,12 @@ mod tests {
     #[test]
     fn test_game_state_trait_implementation() {
         let mut state = MockState::new();
+        let mut renderer = BasicRenderer::new(80, 24).unwrap();
 
         state.update(1.0 / 60.0);
         assert_eq!(state.get_update_count(), 1);
 
-        state.render();
+        state.render(&mut renderer);
         assert_eq!(state.get_render_count(), 1);
 
         let key_event = Event::Key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE));
@@ -353,9 +359,10 @@ mod tests {
     #[test]
     fn test_game_state_render_counting() {
         let state = MockState::new();
+        let mut renderer = BasicRenderer::new(80, 24).unwrap();
 
         for i in 1..=5 {
-            state.render();
+            state.render(&mut renderer);
             assert_eq!(state.get_render_count(), i);
         }
     }
@@ -382,4 +389,3 @@ mod tests {
         assert!(state.on_event(any_event));
     }
 }
-

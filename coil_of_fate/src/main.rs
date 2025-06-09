@@ -1,4 +1,4 @@
-use coil_engine::{Config, Game, GameState};
+use coil_engine::{BasicRenderer, Config, Game, GameState, Renderer};
 use crossterm::event::Event;
 
 struct MyGame {
@@ -15,13 +15,6 @@ impl MyGame {
 impl GameState for MyGame {
     fn update(&mut self, _delta_time: f32) {
         self.frame_count += 1;
-        // Here you could update entities, state machines, etc.
-        // For example:
-        // for entity in &mut self.entities {
-        //     if entity.is_active() {
-        //         entity.update(delta_time);
-        //     }
-        // }
     }
 
     fn on_event(&mut self, event: Event) -> bool {
@@ -39,11 +32,25 @@ impl GameState for MyGame {
         }
     }
 
-    fn render(&self) {
-        // Clear and render
-        print!("\x1B[2J\x1B[1;1H"); // Clear screen and move cursor to top-left
-        println!("Coil of Fate - Frame: {}", self.frame_count);
-        println!("Press Esc or Ctrl+C to exit");
+    fn render(&self, renderer: &mut BasicRenderer) {
+        renderer
+            .draw_str(
+                0,
+                0,
+                &format!("Frame: {}", self.frame_count),
+                crossterm::style::Color::Black,
+                crossterm::style::Color::White,
+            )
+            .unwrap();
+        renderer
+            .draw_str(
+                0,
+                1,
+                "Press Esc or Ctrl+C to exit",
+                crossterm::style::Color::Black,
+                crossterm::style::Color::White,
+            )
+            .unwrap();
     }
 }
 

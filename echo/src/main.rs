@@ -1,24 +1,21 @@
-use coil_engine::{Config, Game, GameState, InputStrategy};
+use coil_engine::{BasicRenderer, Config, Game, GameState, InputStrategy, Renderer};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::Color;
 
 struct EchoGame {
     message: String,
-    should_print: bool,
 }
 
 impl EchoGame {
     fn new() -> Self {
         EchoGame {
             message: String::from("Press any key to echo it. Press Esc to exit."),
-            should_print: true,
         }
     }
 }
 
 impl GameState for EchoGame {
-    fn update(&mut self, _delta_time: f32) {
-        self.should_print = false;
-    }
+    fn update(&mut self, _delta_time: f32) {}
 
     fn on_event(&mut self, event: Event) -> bool {
         match event {
@@ -31,7 +28,6 @@ impl GameState for EchoGame {
                 ..
             }) => true,
             Event::Key(key) => {
-                self.should_print = true;
                 self.message = format!("Key pressed: {}", key.code);
                 false
             }
@@ -39,11 +35,10 @@ impl GameState for EchoGame {
         }
     }
 
-    fn render(&self) {
-        if self.should_print {
-            print!("\x1B[2J\x1B[1;1H"); // Clear screen and move cursor to top-left
-            println!("{}\n", self.message);
-        }
+    fn render(&self, renderer: &mut BasicRenderer) {
+        renderer
+            .draw_str(0, 0, &self.message, Color::Black, Color::White)
+            .unwrap();
     }
 }
 
